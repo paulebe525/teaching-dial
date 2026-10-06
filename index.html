@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Teaching Dial</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#18202C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F2F4F7; --card:#FFFFFF; --text:#18202C; --muted:#5A6576; --faint:#8A94A4;
+  --border:#DCE2EA; --track:#E5EAF1; --holiday:#C2572B; --holiday-tint:#FBE9E0;
+  --research:#3F51C8; --chn:#1E8C63; --on-subject:#FFFFFF;
+  --x1:#B5367F; --x2:#0E7C8B; --x3:#9A6B00; --x4:#5E7D12;
+  --head:"Bricolage Grotesque",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0F141B; --card:#171E28; --text:#E6EBF2; --muted:#9AA5B6; --faint:#6E7A8C;
+    --border:#26303D; --track:#232C38; --holiday:#F0895B; --holiday-tint:#3A241B;
+    --research:#8C9BFF; --chn:#4CC99A; --on-subject:#0F141B;
+    --x1:#F27BC0; --x2:#48C6D6; --x3:#E3B341; --x4:#A7C957;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text)}
+body{font-family:var(--body);font-weight:400;font-size:16px;line-height:1.5;overflow-x:hidden}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.wrap{max-width:1120px;margin:0 auto;padding:32px 16px 48px}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+h1,h2,h3{font-family:var(--head);font-weight:700;margin:0;letter-spacing:-.01em}
+h1{font-size:36px;line-height:1.1;margin-top:6px}
+h2{font-size:22px;line-height:1.2}
+h3{font-size:17px;line-height:1.3}
+.subtitle{color:var(--muted);margin:8px 0 0}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px}
+section{margin-top:24px}
+
+/* Next up */
+.countdown{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:600;font-size:48px;line-height:1.1;margin:8px 0 10px;letter-spacing:-.02em}
+.next-subject{font-weight:600;font-size:18px}
+.next-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px;color:var(--muted)}
+.pill{display:inline-block;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;border:1px solid var(--border);border-radius:999px;padding:2px 10px;color:var(--text)}
+.divider{border-top:1px dashed var(--border);margin-top:16px;padding-top:12px;color:var(--muted);font-size:14px}
+
+/* Dials */
+.tabs{display:none}
+.dials{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.day-card{min-width:0}
+.day-card.past{opacity:.5}
+.day-card.today{outline:2px solid var(--text);outline-offset:-2px}
+.day-card.holiday{background:var(--holiday-tint)}
+.dial{display:block;width:100%;max-width:280px;margin:12px auto 4px;overflow:visible}
+.dial .track{fill:none;stroke:var(--track);stroke-width:16;stroke-linecap:butt}
+.dial .seg{fill:none;stroke-width:16;stroke-linecap:butt}
+.dial .seg.unconfirmed{stroke-dasharray:6 4;opacity:.55}
+.dial .tick{stroke:var(--faint);stroke-width:1}
+.dial .tick.major{stroke-width:2}
+.dial .lbl{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:9.5px;fill:var(--muted)}
+.dial .dayl{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:11px;letter-spacing:.14em;fill:var(--muted)}
+.dial .hrs{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:34px;font-weight:700;fill:var(--text)}
+.dial .hrs tspan{font-size:14px;font-weight:400;fill:var(--muted)}
+.dial .leave{font-family:var(--head);font-size:30px;font-weight:700;fill:var(--holiday)}
+.dial .needle{stroke:var(--text);stroke-width:3;stroke-linecap:round}
+.classes{list-style:none;margin:0;padding:0}
+.classes li{display:flex;align-items:center;gap:10px;padding:4px 0}
+.dot{width:10px;height:10px;border-radius:50%;flex:none}
+.classes .muted,.muted{color:var(--muted)}
+.classes .none{color:var(--muted)}
+
+/* Hours bar */
+.bar{display:flex;height:34px;border-radius:8px;overflow:hidden;margin-top:14px;background:var(--track)}
+.bar .part{display:flex;align-items:center;padding:0 12px;color:var(--on-subject);font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;min-width:0}
+.legend{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.legend li{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.legend b{font-weight:600}
+.legend li .mono{margin-left:auto}
+
+/* How to read */
+.howto{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:14px}
+.howto p{margin:6px 0 0;color:var(--muted);font-size:15px}
+
+/* Upload, settings, check screen */
+[hidden]{display:none !important}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.btn{font-family:var(--body);font-weight:600;font-size:15px;line-height:1.2;border-radius:10px;padding:11px 16px;min-height:44px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer}
+.btn.primary{background:var(--text);border-color:var(--text);color:var(--card)}
+.btn.quiet{border-color:transparent;background:transparent;color:var(--muted);padding-left:8px;padding-right:8px}
+.btn:disabled{opacity:.5;cursor:default}
+.status-line{margin:10px 0 0;font-size:14px;color:var(--muted)}
+.field{display:flex;flex-direction:column;gap:6px;margin-top:16px;min-width:0}
+.field label,.flabel{font-size:14px;font-weight:600;color:var(--text)}
+.input{font-family:var(--body);font-size:16px;color:var(--text);background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;width:100%;min-width:0;min-height:44px}
+.input.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.input:focus,.btn:focus-visible{outline:2px solid var(--text);outline-offset:1px}
+.hint{font-size:14px;color:var(--muted);margin:8px 0 0}
+.hint a{color:var(--text)}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.sep{border-top:1px dashed var(--border);margin-top:20px;padding-top:4px}
+.msg{margin-top:14px;padding:12px 14px;border-radius:10px;font-size:15px;border:1px solid var(--border)}
+.msg.err{background:var(--holiday-tint);border-color:transparent;border-left:3px solid var(--holiday)}
+.plist{list-style:none;margin:12px 0 0;padding:0}
+.plist li{display:flex;gap:10px;padding:6px 0;border-top:1px dashed var(--border);font-size:15px}
+.plist li:first-child{border-top:0}
+.plist .st{color:var(--muted);margin-left:auto;text-align:right}
+.plist .st.bad{color:var(--holiday)}
+.sheet{border-top:1px dashed var(--border);margin-top:14px;padding-top:12px}
+.sheet .who{margin:4px 0 0;font-size:15px}
+.ignored{margin:4px 0 0;font-size:14px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ignored .btn{min-height:32px;padding:4px 10px;font-size:13px}
+.grp{border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:12px}
+.grp.bad{border-color:var(--holiday);border-width:2px}
+.ghead{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:8px}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f > span,.slothead span{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.ghead .input{padding:8px 10px;font-size:15px}
+.slothead,.slot{display:grid;grid-template-columns:24px minmax(68px,1fr) minmax(0,1fr) minmax(0,1fr) 36px;gap:6px;align-items:center}
+.slothead{margin-top:12px}
+.slot{margin-top:6px;border-radius:8px}
+.slot input[type=checkbox]{width:20px;height:20px;margin:0;accent-color:var(--text)}
+.slot .input{padding:6px 8px;font-size:15px;min-height:40px}
+.slot select.input{padding-right:2px}
+.slot.off .input{opacity:.45}
+.slot.bad{outline:2px solid var(--holiday);outline-offset:2px}
+.xbtn{min-height:40px;width:36px;padding:0;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--muted);font-size:18px;line-height:1;cursor:pointer}
+.gfoot{display:flex;align-items:center;gap:8px;margin-top:8px}
+.gfoot .btn{min-height:36px;padding:6px 8px;font-size:14px}
+.mode{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.mode label{display:flex;align-items:flex-start;gap:10px;font-size:15px;cursor:pointer}
+.mode input{width:20px;height:20px;margin:1px 0 0;accent-color:var(--text);flex:none}
+.summary{margin-top:16px;font-size:15px}
+
+@media (max-width:1024px){
+  .dials{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:640px){
+  .wrap{padding:24px 16px 40px}
+  h1{font-size:30px}
+  .countdown{font-size:8.6vw}
+  .tabs{display:flex;gap:6px;margin-bottom:12px}
+  .tabs button{flex:1;min-width:0;font-family:var(--body);font-weight:600;font-size:14px;padding:8px 0;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer}
+  .tabs button.active{background:var(--text);border-color:var(--text);color:var(--card)}
+  .dials{display:flex;gap:16px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;align-items:flex-start;-webkit-overflow-scrolling:touch}
+  .dials::-webkit-scrollbar{display:none}
+  .day-card{flex:0 0 100%;scroll-snap-align:start}
+  .howto{grid-template-columns:1fr;gap:16px}
+  .btnrow .btn,.actions .btn{flex:1 1 auto}
+}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <div class="eyebrow">Mr. Paul Ebenezer</div>
+    <h1>Your week as six dials</h1>
+    <p class="subtitle" id="subtitle"></p>
+    <div class="actions">
+      <button type="button" class="btn primary" id="addBtn">Add timetable</button>
+      <button type="button" class="btn" id="settingsBtn" aria-expanded="false" aria-controls="settingsCard">Settings</button>
+    </div>
+    <p class="status-line" id="dataStatus"></p>
+    <input type="file" id="photoInput" accept="image/*" multiple hidden>
+  </header>
+
+  <section class="card" id="settingsCard" hidden>
+    <h2>Settings</h2>
+    <div class="field">
+      <label for="keyInput">Gemini API key</label>
+      <input class="input mono" id="keyInput" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste your key">
+      <p class="hint" id="keyState"></p>
+      <div class="btnrow">
+        <button type="button" class="btn primary" id="saveKeyBtn">Save key</button>
+        <button type="button" class="btn" id="removeKeyBtn">Remove key</button>
+      </div>
+      <p class="hint">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. The key stays on this phone. It is sent only to Google, when you read a timetable.</p>
+    </div>
+    <div class="sep">
+      <div class="field">
+        <label for="nameInput">My name</label>
+        <input class="input" id="nameInput" type="text" autocomplete="name">
+      </div>
+      <div class="field">
+        <label for="aliasInput">Other ways my name is written</label>
+        <input class="input" id="aliasInput" type="text">
+        <p class="hint">Separate with commas, for example: Mr. Paul Ebenezer, Paul</p>
+      </div>
+      <div class="btnrow"><button type="button" class="btn" id="saveNameBtn">Save name</button></div>
+      <p class="hint" id="nameState"></p>
+    </div>
+    <div class="sep">
+      <div class="field">
+        <span class="flabel">Week data</span>
+        <p class="hint" id="weekState" style="margin-top:0"></p>
+      </div>
+      <div class="btnrow">
+        <button type="button" class="btn" id="resetBtn">Reset to sample</button>
+        <button type="button" class="btn quiet" id="closeSettingsBtn">Close</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="uploadCard" hidden aria-live="polite">
+    <h2>Reading timetables</h2>
+    <ul class="plist" id="uploadList"></ul>
+    <div id="uploadMsg"></div>
+  </section>
+
+  <section class="card" id="checkCard" hidden>
+    <h2>Check before you save</h2>
+    <p class="hint" style="margin-top:6px">These are the classes found for you. Fix anything that was read wrong, then save.</p>
+    <div id="checkSheets"></div>
+    <div class="field">
+      <label for="mondayInput">Week starting Monday</label>
+      <input class="input mono" id="mondayInput" type="date">
+      <p class="hint" id="weekRange"></p>
+    </div>
+    <div id="checkRows"></div>
+    <div class="btnrow"><button type="button" class="btn" id="addRowBtn">Add row</button></div>
+    <div class="mode" role="radiogroup" aria-label="How to save">
+      <label><input type="radio" name="saveMode" value="replace" checked><span>Replace this week's classes</span></label>
+      <label><input type="radio" name="saveMode" value="merge"><span>Add to the classes already in this week</span></label>
+    </div>
+    <p class="summary" id="checkSummary"></p>
+    <div id="checkMsg"></div>
+    <div class="btnrow">
+      <button type="button" class="btn primary" id="confirmBtn">Save to my week</button>
+      <button type="button" class="btn" id="cancelBtn">Cancel</button>
+    </div>
+  </section>
+
+  <section class="card" id="next" aria-live="polite">
+    <div class="eyebrow" id="nextEyebrow">Next up</div>
+    <div class="countdown" id="countdown"></div>
+    <div class="next-subject" id="nextSubject"></div>
+    <div class="next-meta" id="nextMeta"></div>
+    <div class="divider" id="nextThen"></div>
+  </section>
+
+  <section>
+    <nav class="tabs" id="tabs" aria-label="Days"></nav>
+    <div class="dials" id="dials"></div>
+  </section>
+
+  <section class="card">
+    <h2 id="hoursTitle"></h2>
+    <div class="bar" id="bar"></div>
+    <ul class="legend" id="legend"></ul>
+  </section>
+
+  <section class="card">
+    <h2>How to read this view</h2>
+    <div class="howto">
+      <div><h3>A day is a gauge</h3><p>Each dial runs from 8 am at the lower left, over the top at noon, to 5 pm at the lower right. The number in the middle is that day's teaching hours. On today's dial, the dark needle marks the time now.</p></div>
+      <div><h3>Read the gaps</h3><p>Grey stretches of the ring are free time. The line under each dial names the longest free window between 8 am and 5 pm.</p></div>
+      <div><h3>Colour means subject</h3><p>Blue is Research and green is CHN-I. A dashed, faded arc is an unconfirmed class on a day marked as holiday or leave.</p></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ===================== WEEK DATA (edit each week) =====================
+   One entry per class, times in Asia/Kolkata, 24-hour "HH:MM".
+   { subject, className, day, date, start, end, holiday? }
+   Holiday / leave: add holiday:true to an entry. A day-only entry works too:
+     { day:'Wed', date:'2026-10-07', holiday:true }
+   Every class on that date is then shown dashed as unconfirmed. Default: none.
+   Subjects with colours: 'Research', 'CHN-I'.
+   ===================================================================== */
+const WEEK_DATA = [
+  { subject:'Research', className:'VII Sem B.Sc Nursing', day:'Mon', date:'2026-10-05', start:'12:00', end:'13:00' },
+  { subject:'CHN-I', className:'III Year B.Sc Nursing (V Sem)', day:'Mon', date:'2026-10-05', start:'14:00', end:'16:00' },
+  { subject:'Research', className:'VII Sem B.Sc Nursing', day:'Tue', date:'2026-10-06', start:'08:00', end:'09:00' },
+  { subject:'Research', className:'VII Sem B.Sc Nursing', day:'Tue', date:'2026-10-06', start:'12:00', end:'13:00' },
+  { subject:'CHN-I', className:'III Year B.Sc Nursing (V Sem)', day:'Tue', date:'2026-10-06', start:'14:00', end:'16:00' },
+  { subject:'Research', className:'VII Sem B.Sc Nursing', day:'Wed', date:'2026-10-07', start:'08:00', end:'09:00' },
+  { subject:'Research', className:'VII Sem B.Sc Nursing', day:'Wed', date:'2026-10-07', start:'12:00', end:'13:00' },
+  { subject:'CHN-I', className:'III Year B.Sc Nursing (V Sem)', day:'Wed', date:'2026-10-07', start:'14:00', end:'16:00' },
+  { subject:'Research', className:'VII Sem B.Sc Nursing', day:'Thu', date:'2026-10-08', start:'08:00', end:'09:00' },
+  { subject:'Research', className:'VII Sem B.Sc Nursing', day:'Thu', date:'2026-10-08', start:'12:00', end:'13:00' },
+  { subject:'CHN-I', className:'III Year B.Sc Nursing (V Sem)', day:'Thu', date:'2026-10-08', start:'14:00', end:'16:00' },
+  { subject:'Research', className:'VII Sem B.Sc Nursing', day:'Fri', date:'2026-10-09', start:'12:00', end:'13:00' },
+  { subject:'CHN-I', className:'III Year B.Sc Nursing (V Sem)', day:'Fri', date:'2026-10-09', start:'14:00', end:'16:00' },
+  { subject:'Research', className:'VII Sem B.Sc Nursing', day:'Sat', date:'2026-10-10', start:'12:00', end:'13:00' }
+  // Saturday 10 Oct: no CHN-I
+];
+
+const SUBJECT_COLOUR = { 'Research':'var(--research)', 'CHN-I':'var(--chn)' };
+const TZ = 'Asia/Kolkata';
+const DAY_START = 8*60, DAY_END = 17*60;
+const CX = 100, CY = 100, R = 72;
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/* ---------- time helpers ---------- */
+const toMin = s => { const [h,m] = s.split(':').map(Number); return h*60 + m; };
+const pad = n => String(n).padStart(2,'0');
+function istNow(){
+  const d = new Date();
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(d).map(x=>[x.type,x.value]));
+  return { ms:d.getTime(), date:`${p.year}-${p.month}-${p.day}`, mins:(+p.hour)*60 + (+p.minute) + (+p.second)/60 };
+}
+const istMs = (date, hhmm) => new Date(`${date}T${hhmm}:00+05:30`).getTime();
+function dateInfo(date){
+  const [y,m,d] = date.split('-').map(Number), u = new Date(Date.UTC(y,m-1,d));
+  return { dow:DAY_NAMES[u.getUTCDay()], num:d, mon:MONTHS[m-1], year:y };
+}
+function addDays(date, n){
+  const [y,m,d] = date.split('-').map(Number), u = new Date(Date.UTC(y,m-1,d+n));
+  return `${u.getUTCFullYear()}-${pad(u.getUTCMonth()+1)}-${pad(u.getUTCDate())}`;
+}
+function clock(m, withMer){
+  const h = Math.floor(m/60), mm = Math.round(m%60), h12 = (h+11)%12 + 1;
+  return (mm ? `${h12}:${pad(mm)}` : `${h12}`) + (withMer ? (h<12?' am':' pm') : '');
+}
+function range(s, e){
+  const ms = s<720?'am':'pm', me = e<720?'am':'pm';
+  return ms===me ? `${clock(s)}–${clock(e)} ${me}` : `${clock(s)} ${ms}–${clock(e)} ${me}`;
+}
+const hrs = mins => { const h = mins/60; return Number.isInteger(h) ? String(h) : h.toFixed(1); };
+function duration(ms){
+  let m = Math.floor(ms/60000);
+  if (m < 1) return 'under 1 min';
+  const d = Math.floor(m/1440); m -= d*1440;
+  const h = Math.floor(m/60), mm = m%60;
+  if (d) return `${d} d${h ? ' '+h+' h' : ''}`;
+  if (h) return `${h} h${mm ? ' '+mm+' min' : ''}`;
+  return `${mm} min`;
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const colourOf = (subj, extra) => SUBJECT_COLOUR[subj] || (extra && extra[subj]) || (SAVED && SAVED.colours && SAVED.colours[subj]) || 'var(--faint)';
+
+/* ---------- model ---------- */
+function buildWeek(){
+  const DATA = activeData();
+  const dates = DATA.map(e => e.date).sort();
+  let monday = dates[0] || istNow().date;
+  while (dateInfo(monday).dow !== 'Mon') monday = addDays(monday, -1);
+  const holidayDates = new Set(DATA.filter(e => e.holiday).map(e => e.date));
+  const classes = DATA.filter(e => e.subject && e.start && e.end).map(e => ({
+    ...e, s:toMin(e.start), e:toMin(e.end), startMs:istMs(e.date,e.start), endMs:istMs(e.date,e.end),
+    unconfirmed: holidayDates.has(e.date)
+  })).sort((a,b) => a.startMs - b.startMs);
+  const days = Array.from({length:6}, (_,i) => {
+    const date = addDays(monday, i), info = dateInfo(date);
+    const list = classes.filter(c => c.date === date);
+    return { date, ...info, holiday:holidayDates.has(date), classes:list };
+  });
+  return { monday, days, classes };
+}
+function longestFree(list){
+  let cur = DAY_START, best = null;
+  const segs = list.map(c => [Math.max(c.s,DAY_START), Math.min(c.e,DAY_END)]).filter(([a,b]) => b>a).sort((a,b)=>a[0]-b[0]);
+  const consider = (a,b) => { if (b-a > 0 && (!best || b-a > best[1]-best[0])) best = [a,b]; };
+  segs.forEach(([a,b]) => { consider(cur, a); cur = Math.max(cur, b); });
+  consider(cur, DAY_END);
+  return best;
+}
+
+/* ---------- dial SVG ---------- */
+const angleOf = mins => -135 + (mins/60 - 8) / 9 * 270;
+const pt = (a, r) => [CX + r*Math.sin(a*Math.PI/180), CY - r*Math.cos(a*Math.PI/180)];
+const f = n => n.toFixed(2);
+function arcPath(a1, a2, r){
+  const [x1,y1] = pt(a1,r), [x2,y2] = pt(a2,r);
+  return `M${f(x1)} ${f(y1)} A${r} ${r} 0 ${a2-a1 > 180 ? 1 : 0} 1 ${f(x2)} ${f(y2)}`;
+}
+function needleCoords(mins){
+  const a = angleOf(Math.min(Math.max(mins, DAY_START), DAY_END));
+  const [x1,y1] = pt(a, 58), [x2,y2] = pt(a, 86);
+  return {x1:f(x1), y1:f(y1), x2:f(x2), y2:f(y2), a};
+}
+function dialSVG(day, isToday, nowMins){
+  let s = `<svg class="dial" viewBox="0 0 200 180" role="img" aria-label="${day.dow} ${day.num}: ${day.holiday ? 'leave' : hrs(day.classes.reduce((t,c)=>t+c.e-c.s,0))+' hours teaching'}">`;
+  s += `<path class="track" d="${arcPath(-135, 135, R)}"/>`;
+  for (let h = 8; h <= 17; h++){
+    const a = angleOf(h*60), [x1,y1] = pt(a,83), [x2,y2] = pt(a,88);
+    s += `<line class="tick${[8,12,17].includes(h) ? ' major' : ''}" x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}"/>`;
+  }
+  [['8a',8],['12',12],['5p',17]].forEach(([t,h]) => { const [x,y] = pt(angleOf(h*60), 98);
+    s += `<text class="lbl" x="${f(x)}" y="${f(y)}" text-anchor="middle" dominant-baseline="central">${t}</text>`; });
+  day.classes.forEach(c => {
+    const a = Math.max(c.s, DAY_START), b = Math.min(c.e, DAY_END); if (b <= a) return;
+    const un = c.unconfirmed;
+    s += `<path class="seg${un ? ' unconfirmed' : ''}" style="stroke:${colourOf(c.subject)}" d="${arcPath(angleOf(a), angleOf(b), R)}"><title>${esc(c.subject)} ${range(c.s,c.e)}${un ? ' (unconfirmed)' : ''}</title></path>`;
+  });
+  s += `<text class="dayl" x="${CX}" y="84" text-anchor="middle">${day.dow.toUpperCase()} ${day.num}</text>`;
+  if (day.holiday) s += `<text class="leave" x="${CX}" y="118" text-anchor="middle">Leave</text>`;
+  else s += `<text class="hrs" x="${CX}" y="122" text-anchor="middle">${hrs(day.classes.reduce((t,c)=>t+c.e-c.s,0))}<tspan dx="3">h</tspan></text>`;
+  if (isToday){ const n = needleCoords(nowMins); s += `<line class="needle" id="needle" x1="${n.x1}" y1="${n.y1}" x2="${n.x2}" y2="${n.y2}"/>`; }
+  return s + '</svg>';
+}
+
+/* ---------- render ---------- */
+let WEEK, renderedDate = null, activeIdx = 0;
+const dialsEl = document.getElementById('dials'), tabsEl = document.getElementById('tabs');
+
+function renderStatic(){
+  WEEK = buildWeek();
+  const now = istNow(), first = WEEK.days[0], last = WEEK.days[5];
+  document.getElementById('subtitle').innerHTML =
+    `Week of <span class="mono">${first.dow} ${first.num} – ${last.dow} ${last.num} ${last.mon} ${last.year}</span>`;
+
+  dialsEl.innerHTML = WEEK.days.map(d => {
+    const isToday = d.date === now.date, past = d.date < now.date;
+    const items = d.classes.length ? d.classes.map(c =>
+      `<li><span class="dot" style="background:${colourOf(c.subject)}"></span><span class="mono">${range(c.s,c.e)}</span><span class="muted">${esc(c.subject)}${c.unconfirmed ? ', unconfirmed' : ''}</span></li>`).join('')
+      : `<li class="none">No classes</li>`;
+    const free = longestFree(d.classes);
+    const freeTxt = free ? `Longest free window <span class="mono">${range(free[0],free[1])} · ${hrs(free[1]-free[0])} h</span>` : 'No free window';
+    return `<article class="card day-card${isToday?' today':''}${past?' past':''}${d.holiday?' holiday':''}" data-date="${d.date}" aria-label="${d.dow} ${d.num} ${d.mon}">
+      ${dialSVG(d, isToday, now.mins)}
+      <ul class="classes">${items}</ul>
+      <div class="divider">${freeTxt}</div></article>`;
+  }).join('');
+  tabsEl.innerHTML = WEEK.days.map((d,i) => `<button type="button" data-i="${i}">${d.dow}</button>`).join('');
+  tabsEl.querySelectorAll('button').forEach(b => b.onclick = () => goTo(+b.dataset.i, true));
+
+  // hours bar
+  const counted = WEEK.classes.filter(c => !c.unconfirmed);
+  const total = counted.reduce((t,c) => t + c.e - c.s, 0);
+  document.getElementById('hoursTitle').innerHTML = `Where the <span class="mono">${hrs(total)}</span> hours go`;
+  const bySubj = {}, byRow = {};
+  counted.forEach(c => { bySubj[c.subject] = (bySubj[c.subject]||0) + c.e - c.s;
+    const k = c.subject + '|' + c.className; byRow[k] = (byRow[k]||0) + c.e - c.s; });
+  document.getElementById('bar').innerHTML = Object.entries(bySubj).map(([s,m]) =>
+    `<div class="part" style="flex:${m} 1 0;background:${colourOf(s)}" title="${esc(s)} ${hrs(m)} h">${esc(s)}</div>`).join('');
+  document.getElementById('legend').innerHTML = Object.entries(byRow).map(([k,m]) => { const [s,cl] = k.split('|');
+    return `<li><span class="dot" style="background:${colourOf(s)}"></span><b>${esc(s)}</b><span class="muted">${esc(cl)}</span><span class="mono">${hrs(m)} h · ${Math.round(m/total*100)}%</span></li>`; }).join('');
+
+  renderedDate = now.date;
+  const ti = WEEK.days.findIndex(d => d.date === now.date);
+  goTo(ti >= 0 ? ti : 0, false);
+}
+
+function goTo(i, smooth){
+  activeIdx = i;
+  tabsEl.querySelectorAll('button').forEach((b,j) => b.classList.toggle('active', j === i));
+  if (getComputedStyle(dialsEl).display === 'flex'){
+    const step = dialsEl.clientWidth + 16;
+    dialsEl.scrollTo({left: i*step, behavior: smooth ? 'smooth' : 'auto'});
+  }
+}
+dialsEl.addEventListener('scroll', () => {
+  const step = dialsEl.clientWidth + 16, i = Math.round(dialsEl.scrollLeft / step);
+  if (i !== activeIdx && i >= 0 && i < 6){ activeIdx = i; tabsEl.querySelectorAll('button').forEach((b,j) => b.classList.toggle('active', j === i)); }
+}, {passive:true});
+window.addEventListener('resize', () => goTo(activeIdx, false));
+
+function renderLive(){
+  const now = istNow();
+  if (now.date !== renderedDate) renderStatic();
+  const needle = document.getElementById('needle');
+  if (needle){ const n = needleCoords(now.mins); ['x1','y1','x2','y2'].forEach(k => needle.setAttribute(k, n[k])); }
+
+  const upcoming = WEEK.classes.filter(c => !c.unconfirmed && c.endMs > now.ms);
+  const current = upcoming.find(c => c.startMs <= now.ms);
+  const shown = current || upcoming[0];
+  const then = shown ? upcoming[upcoming.indexOf(shown) + 1] : null;
+  const $ = id => document.getElementById(id);
+  $('nextEyebrow').textContent = current ? 'Happening now' : 'Next up';
+  if (!shown){
+    $('countdown').textContent = 'No more classes this week';
+    $('countdown').style.fontSize = '28px';
+    $('nextSubject').textContent = ''; $('nextMeta').innerHTML = ''; $('nextThen').style.display = 'none';
+    return;
+  }
+  $('countdown').style.fontSize = '';
+  $('countdown').textContent = current ? `${duration(shown.endMs - now.ms)} left` : `in ${duration(shown.startMs - now.ms)}`;
+  const di = dateInfo(shown.date);
+  $('nextSubject').textContent = `${shown.subject} · ${shown.className}`;
+  $('nextMeta').innerHTML = `<span class="mono">${di.dow} ${di.num} ${di.mon} · ${range(shown.s, shown.e)}</span><span class="pill">${hrs(shown.e - shown.s)} h class</span>`;
+  $('nextThen').style.display = '';
+  if (then){ const t = dateInfo(then.date); $('nextThen').innerHTML = `Then ${esc(then.subject)} · <span class="mono">${t.dow} ${t.num}, ${range(then.s, then.e)}</span>`; }
+  else $('nextThen').textContent = 'Then nothing else this week';
+}
+
+/* ===================== PHOTO UPLOAD (Gemini) ===================== */
+const CONFIG = {
+  geminiModel: 'gemini-3.8-flash',   // fast Gemini vision model; change here if Google renames it
+  geminiBase: 'https://generativelanguage.googleapis.com/v1beta/models/',
+  maxImageSide: 1600, jpegQuality: 0.85,
+  defaultName: 'Paul Ebenezer', defaultAliases: 'Mr. Paul Ebenezer, Paul'
+};
+const LS = { key:'teachingDial.geminiKey', name:'teachingDial.name', aliases:'teachingDial.aliases', week:'teachingDial.week' };
+const EXTRA_COLOURS = ['var(--x1)','var(--x2)','var(--x3)','var(--x4)'];
+const lsGet = k => { try { return localStorage.getItem(k); } catch(e){ return null; } };
+const lsSet = (k,v) => { try { localStorage.setItem(k,v); return true; } catch(e){ return false; } };
+const lsDel = k => { try { localStorage.removeItem(k); } catch(e){} };
+function loadSaved(){ try { const s = JSON.parse(lsGet(LS.week) || 'null'); if (s && Array.isArray(s.data) && s.data.length) return s; } catch(e){} return null; }
+var SAVED = loadSaved();
+function activeData(){ return SAVED ? SAVED.data : WEEK_DATA; }
+const $id = id => document.getElementById(id);
+const toHHMM = m => `${pad(Math.floor(m/60))}:${pad(m%60)}`;
+const DAY_KEYS = ['Mon','Tue','Wed','Thu','Fri','Sat'];
+
+/* ---------- settings ---------- */
+function myNames(){
+  const full = (lsGet(LS.name) || CONFIG.defaultName).trim();
+  const aliasStr = lsGet(LS.aliases); const aliases = (aliasStr === null ? CONFIG.defaultAliases : aliasStr).split(',').map(x => x.trim()).filter(Boolean);
+  const ft = nameTokens(full);
+  return { full, aliases, first: ft[0] || '', surname: ft.length > 1 ? ft[ft.length-1] : '',
+    known: new Set([...ft, ...aliases.flatMap(nameTokens)]),
+    aliasKeys: aliases.map(a => nameTokens(a).join(' ')).filter(k => k.split(' ').length >= 2) };
+}
+function renderDataState(){
+  const st = SAVED ? `Showing your saved week${SAVED.savedAt ? ', updated ' + new Intl.DateTimeFormat('en-GB',{timeZone:TZ,day:'numeric',month:'short'}).format(new Date(SAVED.savedAt)) : ''}.` : 'Showing the sample week.';
+  $id('dataStatus').textContent = st;
+  $id('weekState').textContent = SAVED ? st + ' Reset to go back to the sample week.' : st;
+  $id('resetBtn').disabled = !SAVED;
+  const key = lsGet(LS.key);
+  $id('keyState').textContent = key ? `Key saved on this phone, ending in ${key.slice(-4)}.` : 'No key saved yet.';
+  $id('removeKeyBtn').disabled = !key;
+  $id('keyInput').value = '';
+  $id('keyInput').placeholder = key ? 'Paste a new key to replace it' : 'Paste your key';
+  const me = myNames(); $id('nameInput').value = me.full; $id('aliasInput').value = me.aliases.join(', ');
+}
+function toggleSettings(show){
+  const card = $id('settingsCard'); const on = show ?? card.hidden;
+  card.hidden = !on; $id('settingsBtn').setAttribute('aria-expanded', String(on));
+  if (on){ renderDataState(); card.scrollIntoView({behavior:'smooth', block:'start'}); }
+}
+$id('settingsBtn').onclick = () => toggleSettings();
+$id('closeSettingsBtn').onclick = () => toggleSettings(false);
+$id('saveKeyBtn').onclick = () => {
+  const v = $id('keyInput').value.trim();
+  if (!v){ $id('keyState').textContent = 'Paste the key first.'; return; }
+  if (!lsSet(LS.key, v)){ $id('keyState').textContent = 'Could not save on this phone. Private browsing may block saving.'; return; }
+  renderDataState();
+};
+$id('removeKeyBtn').onclick = () => { lsDel(LS.key); renderDataState(); };
+$id('saveNameBtn').onclick = () => {
+  const n = $id('nameInput').value.trim();
+  if (!n){ $id('nameState').textContent = 'Enter your name first.'; return; }
+  lsSet(LS.name, n); lsSet(LS.aliases, $id('aliasInput').value.trim());
+  renderDataState(); $id('nameState').textContent = 'Name saved.';
+};
+$id('resetBtn').onclick = () => { lsDel(LS.week); SAVED = null; renderStatic(); renderLive(); renderDataState(); };
+
+/* ---------- name matching (done here, not by the AI) ---------- */
+const TITLES = new Set(['mr','mrs','ms','miss','dr','prof','sr','sister','rev','fr']);
+function nameTokens(s){ return String(s || '').toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(t => t && !TITLES.has(t)); }
+function classifyName(coord, allCoords, me){
+  const t = nameTokens(coord); if (!t.length || !me.first) return {type:'none'};
+  const extras = t.filter(x => x.length > 1 && !me.known.has(x));      // single letters are initials
+  const hasFirst = t.includes(me.first), hasSur = !!me.surname && t.includes(me.surname);
+  if (me.aliasKeys.includes(t.join(' ')) || (hasSur && !extras.length))
+    return {type:'match', how: hasFirst && hasSur ? 'full name' : hasSur ? 'surname' : 'saved name'};
+  if (!hasFirst && !hasSur) return {type:'none'};
+  if (extras.length) return {type:'ignored', reason:'different person'};
+  const rival = allCoords.some(c => c !== coord && nameTokens(c).includes(me.first) && nameTokens(c).some(x => x.length > 1 && !me.known.has(x)));
+  if (rival) return {type:'ignored', reason:`only "${coord.trim()}" is written and another person on this sheet has that name`};
+  return {type:'match', how:'first name only, no other ' + coord.trim() + ' on this sheet'};
+}
+
+/* ---------- cleaning what Gemini returns ---------- */
+const DAY_ALIASES = {mon:'Mon',monday:'Mon',tue:'Tue',tues:'Tue',tuesday:'Tue',wed:'Wed',wednesday:'Wed',thu:'Thu',thur:'Thu',thurs:'Thu',thursday:'Thu',fri:'Fri',friday:'Fri',sat:'Sat',saturday:'Sat'};
+function parseTime(s){ const m = String(s || '').trim().match(/^(\d{1,2})(?:[:.](\d{2}))?/); if (!m) return null; const h = +m[1], mm = +(m[2] || 0); return h > 23 || mm > 59 ? null : h*60 + mm; }
+function fixTimes(s, e){
+  if (s == null || e == null) return [s, e];
+  if (s < 7*60) s += 720;                  // "2-4" read as 02:00 -> 14:00
+  if (e < 7*60 || (e <= s && e + 720 <= 18*60)) e += 720;   // "12-1" -> 12:00-13:00
+  return [s, e];
+}
+function shortSubject(raw){
+  const base = String(raw || '').replace(/\s+/g, ' ').trim().split(/\b(?:including|incl\.?)\b|\(/i)[0].trim();
+  const num = (base.match(/(?:[-–]\s*|\s)(I{1,3}|IV|[1-4])\s*$/i) || [])[1];
+  const suffix = num ? '-' + ({'1':'I','2':'II','3':'III','4':'IV'}[num] || num.toUpperCase()) : '';
+  const rules = [[/research/i,'Research',0],[/community\s+health/i,'CHN',1],[/child\s+health/i,'Child Health',1],[/mental\s+health/i,'MHN',1],
+                 [/\bobg\b|obstetric|midwif/i,'OBG',0],[/educational\s+technology|nursing\s+education/i,'Nursing Education',0],[/medical\s+surgical/i,'MSN',1]];
+  for (const [re, name, numbered] of rules) if (re.test(base)) return numbered ? name + suffix : name;
+  return base.replace(/[-–\s]+$/, '').slice(0, 28) || 'Class';
+}
+function classLabel(batch, sem){
+  let b = String(batch || '').replace(/\s+/g, ' ').trim();
+  const m = String(sem || '').match(/\b([IVX]+|\d+)(?:st|nd|rd|th)?\b/i);
+  const semS = m ? m[1].toUpperCase() + ' Sem' : String(sem || '').trim();
+  if (semS && !new RegExp('\\b' + semS.split(' ')[0] + '\\s*sem', 'i').test(b)) b = b ? `${b} (${semS})` : semS;
+  return b || 'Class';
+}
+function mondayOf(dateStr){
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) return null;
+  let d = dateStr, n = 0; while (dateInfo(d).dow !== 'Mon' && n++ < 7) d = dateInfo(d).dow === 'Sun' ? addDays(d, 1) : addDays(d, -1);
+  return d;
+}
+function defaultMonday(){ const t = istNow().date; return mondayOf(t); }
+
+/* ---------- Gemini request ---------- */
+class UserError extends Error { constructor(kind, detail){ super(kind); this.kind = kind; this.detail = detail || ''; } }
+const ERR = {
+  nokey: 'Add your Gemini API key in Settings first.',
+  badkey: 'Google did not accept the API key. Check it in Settings, or make a new key at aistudio.google.com/apikey.',
+  network: 'Could not reach Google. Check the internet connection and try again.',
+  quota: 'Gemini says the free limit is used up for now. Wait a minute and try again.',
+  model: `The Gemini model "${CONFIG.geminiModel}" is not available for this key.`,
+  unreadable: 'Could not read a timetable from this photo. Try a clearer photo taken straight on.',
+  image: 'This photo could not be opened. Try a JPEG or PNG photo.',
+  api: 'Gemini returned an error.',
+};
+const PROMPT = `Read this class timetable photo. It may be printed or handwritten, and the photo may be rotated.
+Return:
+- batch: the batch or class name as written (for example "III Year B.Sc. Nursing").
+- semester: the semester as written (for example "V Semester").
+- weekStart and weekEnd: the week's first and last dates as YYYY-MM-DD if dates are written; use an empty string if not.
+- rows: one entry per subject row with subject (as written), coordinator (the teacher or coordinator name exactly as written, keep titles like Mr., Mrs., Ms.), and slots.
+Each slot is {day, start, end}: day is Mon, Tue, Wed, Thu, Fri or Sat; start and end are 24-hour HH:MM.
+College hours are 8 am to 5 pm. So afternoon times written like 2-4, 2.00-4.00 or 4-5 are pm (14:00-16:00, 16:00-17:00), and 12-1 means 12:00-13:00 (noon to 1 pm). 8-9, 9-12 and 10.15-12.00 are morning.
+A cell with two ranges, such as "8-9, 2-5", is two slots. Ignore "--" or empty cells and ignore hour totals written at the end of a row.
+Do not invent names, subjects or times that are not on the sheet.`;
+const SCHEMA = {
+  type:'OBJECT',
+  properties:{
+    batch:{type:'STRING'}, semester:{type:'STRING'},
+    weekStart:{type:'STRING', description:'YYYY-MM-DD or empty'}, weekEnd:{type:'STRING', description:'YYYY-MM-DD or empty'},
+    rows:{type:'ARRAY', items:{type:'OBJECT', properties:{
+      subject:{type:'STRING'}, coordinator:{type:'STRING'},
+      slots:{type:'ARRAY', items:{type:'OBJECT', properties:{
+        day:{type:'STRING', enum:['Mon','Tue','Wed','Thu','Fri','Sat']}, start:{type:'STRING', description:'HH:MM 24-hour'}, end:{type:'STRING', description:'HH:MM 24-hour'}
+      }, required:['day','start','end']}}
+    }, required:['subject','coordinator','slots']}}
+  },
+  required:['batch','semester','weekStart','weekEnd','rows']
+};
+async function downscale(file){
+  let img;
+  try { img = await createImageBitmap(file); }
+  catch(e){
+    img = await new Promise((ok, bad) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => bad(new UserError('image')); im.src = URL.createObjectURL(file); });
+  }
+  const k = Math.min(1, CONFIG.maxImageSide / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+  return { base64: c.toDataURL('image/jpeg', CONFIG.jpegQuality).split(',')[1], w, h };
+}
+async function readTimetable(file, key){
+  const img = await downscale(file);
+  let res;
+  try {
+    res = await fetch(`${CONFIG.geminiBase}${CONFIG.geminiModel}:generateContent`, {
+      method:'POST', headers:{'Content-Type':'application/json', 'x-goog-api-key':key},
+      body: JSON.stringify({
+        contents:[{ role:'user', parts:[{ text:PROMPT }, { inline_data:{ mime_type:'image/jpeg', data:img.base64 } }] }],
+        generationConfig:{ responseMimeType:'application/json', responseSchema:SCHEMA }
+      })
+    });
+  } catch(e){ throw new UserError('network'); }
+  if (!res.ok){
+    let body = {}; try { body = await res.json(); } catch(e){}
+    const all = JSON.stringify(body.error || body), msg = (body.error && body.error.message) || '';
+    if (/API_KEY_INVALID|API key not valid|API_KEY_/i.test(all) || res.status === 401 || res.status === 403) throw new UserError('badkey');
+    if (res.status === 429) throw new UserError('quota');
+    if (res.status === 404) throw new UserError('model');
+    throw new UserError('api', `${res.status}${msg ? ': ' + msg : ''}`);
+  }
+  let data; try { data = await res.json(); } catch(e){ throw new UserError('unreadable'); }
+  const text = ((data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [])
+    .filter(p => p.text && !p.thought).map(p => p.text).join('');
+  let json; try { json = JSON.parse(text); } catch(e){ throw new UserError('unreadable'); }
+  if (!json || !Array.isArray(json.rows) || !json.rows.length) throw new UserError('unreadable');
+  return json;
+}
+
+/* ---------- upload flow ---------- */
+let PENDING = null, rowSeq = 0;
+$id('addBtn').onclick = () => {
+  if (!lsGet(LS.key)){ showUpload([], ERR.nokey); toggleSettings(true); $id('keyInput').focus(); return; }
+  $id('photoInput').click();
+};
+$id('photoInput').addEventListener('change', e => { const files = [...e.target.files]; e.target.value = ''; if (files.length) handlePhotos(files); });
+function showUpload(items, error){
+  $id('uploadCard').hidden = false;
+  $id('uploadList').innerHTML = items.map(it => `<li><span>Photo ${it.n}</span><span class="st${it.bad ? ' bad' : ''}">${esc(it.text)}</span></li>`).join('');
+  $id('uploadMsg').innerHTML = error ? `<div class="msg err">${esc(error)}</div>` : '';
+}
+async function handlePhotos(files){
+  const key = lsGet(LS.key);
+  if (!key){ showUpload([], ERR.nokey); toggleSettings(true); return; }
+  $id('checkCard').hidden = true; $id('addBtn').disabled = true;
+  const items = files.map((f, i) => ({n:i+1, text:'Waiting'})), sheets = [];
+  let fatal = null;
+  showUpload(items); $id('uploadCard').scrollIntoView({behavior:'smooth', block:'start'});
+  for (let i = 0; i < files.length; i++){
+    if (fatal){ items[i].text = 'Skipped'; continue; }
+    items[i].text = 'Reading...'; showUpload(items);
+    try {
+      const t = await readTimetable(files[i], key);
+      sheets.push(t); items[i].text = `${classLabel(t.batch, t.semester)}, ${t.rows.length} rows`;
+    } catch(err){
+      const kind = err.kind || 'unreadable';
+      items[i].text = 'Not read'; items[i].bad = true;
+      if (['badkey','network','quota','model','nokey'].includes(kind)) fatal = (ERR[kind] || ERR.api);
+      else items[i].why = (ERR[kind] || ERR.unreadable) + (err.detail ? ' (' + err.detail + ')' : '');
+    }
+    showUpload(items);
+  }
+  $id('addBtn').disabled = false;
+  const why = items.filter(x => x.why).map(x => `Photo ${x.n}: ${x.why}`).join(' ');
+  if (fatal){ showUpload(items, fatal); if (/Settings/.test(fatal)) toggleSettings(true); return; }
+  if (!sheets.length){ showUpload(items, why || ERR.unreadable); return; }
+  buildPending(sheets);
+  const matched = PENDING.rows.length;
+  showUpload(items, matched ? (why || '') : `No classes found for ${myNames().full} on ${sheets.length > 1 ? 'these timetables' : 'this timetable'}. Check My name in Settings, or add the classes by hand below.`);
+  renderCheck(); $id('checkCard').hidden = false; $id('checkCard').scrollIntoView({behavior:'smooth', block:'start'});
+}
+function rowsFromSheetRow(sheet, row){
+  const cls = classLabel(sheet.batch, sheet.semester), out = [];
+  (row.slots || []).forEach(sl => {
+    const day = DAY_ALIASES[String(sl.day || '').toLowerCase().replace(/[^a-z]/g, '')]; if (!day) return;
+    const [s, e] = fixTimes(parseTime(sl.start), parseTime(sl.end));
+    out.push({ id: ++rowSeq, include:true, subject: shortSubject(row.subject), className: cls, day,
+               start: s == null ? '' : toHHMM(s), end: e == null ? '' : toHHMM(e) });
+  });
+  return out.sort((a, b) => DAY_KEYS.indexOf(a.day) - DAY_KEYS.indexOf(b.day) || a.start.localeCompare(b.start));
+}
+function buildPending(sheets){
+  const me = myNames(), rows = [], info = [];
+  let monday = null;
+  sheets.forEach(sheet => {
+    const coords = sheet.rows.map(r => r.coordinator || '');
+    const found = [], ignored = [];
+    sheet.rows.forEach(r => {
+      const c = classifyName(r.coordinator || '', coords, me);
+      if (c.type === 'match'){ found.push({coord:r.coordinator, how:c.how, subject:r.subject}); rows.push(...rowsFromSheetRow(sheet, r)); }
+      else if (c.type === 'ignored') ignored.push({coord:r.coordinator, reason:c.reason, subject:r.subject, sheet, row:r});
+    });
+    const m = mondayOf(sheet.weekStart) || mondayOf(sheet.weekEnd);
+    if (!monday && m) monday = m;
+    info.push({ label: classLabel(sheet.batch, sheet.semester), dates: [sheet.weekStart, sheet.weekEnd].filter(Boolean).join(' to '), found, ignored, monday: m });
+  });
+  const differ = new Set(info.map(x => x.monday).filter(Boolean)).size > 1;
+  PENDING = { rows, info, monday: monday || defaultMonday(), differ };
+}
+function fmtLongDate(d){ const i = dateInfo(d); return `${i.dow} ${i.num} ${i.mon} ${i.year}`; }
+function renderCheck(){
+  const P = PENDING;
+  $id('checkSheets').innerHTML = P.info.map((s, si) => `<div class="sheet">
+      <div class="eyebrow">Timetable ${si+1} of ${P.info.length}</div>
+      <div class="next-subject" style="font-size:16px;margin-top:4px">${esc(s.label)}${s.dates ? ` <span class="mono muted" style="font-weight:400;font-size:14px">${esc(s.dates)}</span>` : ''}</div>
+      ${s.found.length ? s.found.map(f => `<p class="who">Found you as "${esc(f.coord)}" on ${esc(shortSubject(f.subject))} <span class="muted">(${esc(f.how)})</span></p>`).join('') : `<p class="who muted">Your name was not found on this sheet.</p>`}
+      ${s.ignored.map((g, gi) => `<p class="ignored"><span>Ignored: ${esc(g.coord)}, ${esc(g.reason)} (${esc(shortSubject(g.subject))})</span><button type="button" class="btn" data-addign="${si}:${gi}">Add anyway</button></p>`).join('')}
+    </div>`).join('') + (P.differ ? `<div class="msg err">These timetables show different weeks. Check the week below.</div>` : '');
+  $id('mondayInput').value = P.monday;
+  $id('weekRange').innerHTML = `<span class="mono">${esc(fmtLongDate(P.monday).replace(/ \d{4}$/, ''))} – ${esc(fmtLongDate(addDays(P.monday, 5)))}</span>`;
+  const colours = pendingColours();
+  const groups = [];
+  P.rows.forEach((r, i) => { const k = r.subject + '\u0000' + r.className; let g = groups.find(x => x.key === k); if (!g){ g = {key:k, subject:r.subject, className:r.className, idx:[]}; groups.push(g); } g.idx.push(i); });
+  $id('checkRows').innerHTML = groups.length ? groups.map((g, gi) => `<div class="grp${g.idx.some(i => P.rows[i].badHead) ? ' bad' : ''}" data-g="${gi}">
+      <div class="ghead">
+        <label class="f"><span><span class="dot" style="background:${colourOf(g.subject, colours)};display:inline-block;margin-right:6px;vertical-align:0"></span>Subject</span><input class="input" data-gf="subject" data-g="${gi}" value="${esc(g.subject)}" aria-label="Subject"></label>
+        <label class="f"><span>Class</span><input class="input" data-gf="className" data-g="${gi}" value="${esc(g.className)}" aria-label="Class"></label>
+      </div>
+      <div class="slothead" aria-hidden="true"><span></span><span>Day</span><span>Start</span><span>End</span><span></span></div>
+      ${g.idx.map(i => { const r = P.rows[i]; return `<div class="slot${r.include ? '' : ' off'}${r.bad ? ' bad' : ''}" data-row="${i}">
+        <input type="checkbox" data-f="include" data-i="${i}" ${r.include ? 'checked' : ''} aria-label="Include ${esc(r.subject)} ${r.day} ${esc(r.start)}">
+        <select class="input" data-f="day" data-i="${i}" aria-label="Day">${DAY_KEYS.map(d => `<option${d === r.day ? ' selected' : ''}>${d}</option>`).join('')}</select>
+        <input class="input mono" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" autocomplete="off" data-f="start" data-i="${i}" value="${esc(r.start)}" aria-label="Start, 24-hour">
+        <input class="input mono" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" autocomplete="off" data-f="end" data-i="${i}" value="${esc(r.end)}" aria-label="End, 24-hour">
+        <button type="button" class="xbtn" data-del="${i}" aria-label="Delete row">×</button></div>`; }).join('')}
+      <div class="gfoot"><button type="button" class="btn quiet" data-addto="${gi}">Add time</button></div>
+    </div>`).join('') : `<p class="hint">No rows yet. Use Add row to enter a class by hand.</p>`;
+  $id('checkRows').querySelectorAll('[data-f]').forEach(el => el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', () => {
+    const r = P.rows[+el.dataset.i]; r[el.dataset.f] = el.type === 'checkbox' ? el.checked : el.value; r.bad = false;
+    const slot = el.closest('.slot'); slot.classList.remove('bad'); if (el.type === 'checkbox') slot.classList.toggle('off', !el.checked);
+    renderSummary();
+  }));
+  $id('checkRows').querySelectorAll('[data-f="start"],[data-f="end"]').forEach(el => el.addEventListener('change', () => {
+    const r = P.rows[+el.dataset.i], [s0, e0] = fixTimes(parseTime(r.start), parseTime(r.end));
+    if (parseTime(r.start) != null && s0 != null) r.start = toHHMM(s0);
+    if (parseTime(r.end) != null && e0 != null) r.end = toHHMM(e0);
+    const slot = el.closest('.slot'); slot.querySelector('[data-f="start"]').value = r.start; slot.querySelector('[data-f="end"]').value = r.end; renderSummary();
+  }));
+  $id('checkRows').querySelectorAll('[data-gf]').forEach(el => {
+    el.addEventListener('input', () => { const g = groups[+el.dataset.g]; g.idx.forEach(i => { P.rows[i][el.dataset.gf] = el.value; P.rows[i].badHead = false; }); el.closest('.grp').classList.remove('bad');
+      if (el.dataset.gf === 'subject') el.closest('.grp').querySelector('.dot').style.background = colourOf(el.value.trim(), pendingColours()); });
+    el.addEventListener('change', () => renderCheck());
+  });
+  $id('checkRows').querySelectorAll('[data-del]').forEach(b => b.onclick = () => { P.rows.splice(+b.dataset.del, 1); renderCheck(); });
+  $id('checkRows').querySelectorAll('[data-addto]').forEach(b => b.onclick = () => {
+    const g = groups[+b.dataset.addto], last = P.rows[g.idx[g.idx.length - 1]];
+    P.rows.splice(g.idx[g.idx.length - 1] + 1, 0, { id: ++rowSeq, include:true, subject:g.subject, className:g.className, day:last.day, start:'', end:'' });
+    renderCheck();
+  });
+  $id('checkSheets').querySelectorAll('[data-addign]').forEach(b => b.onclick = () => {
+    const [si, gi] = b.dataset.addign.split(':').map(Number), g = P.info[si].ignored[gi];
+    P.rows.push(...rowsFromSheetRow(g.sheet, g.row)); P.info[si].ignored.splice(gi, 1);
+    P.info[si].found.push({coord:g.coord, how:'added by you', subject:g.subject}); renderCheck();
+  });
+  renderSummary();
+}
+function renderSummary(){
+  const inc = PENDING.rows.filter(r => r.include);
+  const mins = inc.reduce((t, r) => { const s = parseTime(r.start), e = parseTime(r.end); return t + (s != null && e != null && e > s ? e - s : 0); }, 0);
+  $id('checkSummary').innerHTML = `<span class="mono">${inc.length}</span> ${inc.length === 1 ? 'class' : 'classes'} selected, <span class="mono">${hrs(mins)}</span> h in total. Times are 24-hour.`;
+  $id('confirmBtn').disabled = !inc.length;
+}
+function pendingColours(extraSubjects){
+  const colours = Object.assign({}, (SAVED && SAVED.colours) || {});
+  const used = new Set(Object.values(colours));
+  const subjects = [...new Set([...(extraSubjects || []), ...activeData().map(e => e.subject), ...(PENDING ? PENDING.rows.map(r => r.subject.trim()) : [])].filter(Boolean))];
+  subjects.forEach(s => {
+    if (SUBJECT_COLOUR[s] || colours[s]) return;
+    const free = EXTRA_COLOURS.find(c => !used.has(c)) || EXTRA_COLOURS[Object.keys(colours).length % EXTRA_COLOURS.length];
+    colours[s] = free; used.add(free);
+  });
+  return colours;
+}
+$id('mondayInput').addEventListener('change', e => {
+  const m = mondayOf(e.target.value); if (!m) return;
+  PENDING.monday = m; e.target.value = m;
+  $id('weekRange').innerHTML = `<span class="mono">${esc(fmtLongDate(m).replace(/ \d{4}$/, ''))} – ${esc(fmtLongDate(addDays(m, 5)))}</span>`;
+});
+$id('addRowBtn').onclick = () => {
+  PENDING.rows.push({ id: ++rowSeq, include:true, subject:'', className:'', day:'Mon', start:'', end:'' });
+  renderCheck(); const grps = $id('checkRows').querySelectorAll('.grp'); const lastG = grps[grps.length - 1];
+  if (lastG){ lastG.scrollIntoView({behavior:'smooth', block:'center'}); lastG.querySelector('[data-gf="subject"]').focus({preventScroll:true}); }
+};
+$id('cancelBtn').onclick = () => { PENDING = null; $id('checkCard').hidden = true; $id('uploadCard').hidden = true; window.scrollTo({top:0, behavior:'smooth'}); };
+$id('confirmBtn').onclick = () => {
+  const P = PENDING, inc = P.rows.filter(r => r.include);
+  let bad = 0;
+  P.rows.forEach(r => { r.subject = r.subject.trim(); r.className = r.className.trim();
+    let [s, e] = fixTimes(parseTime(r.start), parseTime(r.end));
+    if (s != null) r.start = toHHMM(s); if (e != null) r.end = toHHMM(e);
+    r.badHead = r.include && (!r.subject || !r.className);
+    r.bad = r.include && (!DAY_KEYS.includes(r.day) || s == null || e == null || e <= s);
+    if (r.bad || r.badHead) bad++; });
+  if (bad){ renderCheck(); $id('checkMsg').innerHTML = `<div class="msg err">Fix the highlighted ${bad === 1 ? 'row' : 'rows'}: each class needs a subject, a class name, and an end time after the start time.</div>`; return; }
+  const mode = document.querySelector('input[name="saveMode"]:checked').value;
+  const monday = P.monday, sunday = addDays(monday, 6);
+  const entries = inc.map(r => ({ subject:r.subject, className:r.className, day:r.day, date:addDays(monday, DAY_KEYS.indexOf(r.day)), start:r.start, end:r.end }));
+  const base = mode === 'merge' ? activeData().filter(e => e.date >= monday && e.date <= sunday) : [];
+  const keyOf = e => [e.date, e.start, e.end, e.subject].join('|');
+  const seen = new Set(base.map(keyOf)), data = base.slice();
+  entries.forEach(e => { if (!seen.has(keyOf(e))){ seen.add(keyOf(e)); data.push(e); } });
+  data.sort((a, b) => (a.date + (a.start || '')).localeCompare(b.date + (b.start || '')));
+  const colours = pendingColours(data.map(e => e.subject));
+  Object.keys(colours).forEach(k => { if (!data.some(e => e.subject === k)) delete colours[k]; });
+  const next = { data, colours, savedAt: new Date().toISOString() };
+  if (!lsSet(LS.week, JSON.stringify(next))){ $id('checkMsg').innerHTML = `<div class="msg err">Could not save on this phone. Private browsing or full storage may block saving.</div>`; return; }
+  SAVED = next; PENDING = null;
+  $id('checkCard').hidden = true; $id('checkMsg').innerHTML = '';
+  $id('uploadMsg').innerHTML = `<div class="msg">Saved. Your week now shows <span class="mono">${entries.length}</span> classes from the timetables.</div>`;
+  renderStatic(); renderLive(); renderDataState();
+  window.scrollTo({top:0, behavior:'smooth'});
+};
+
+renderStatic();
+renderLive();
+renderDataState();
+setInterval(renderLive, 30000);
+</script>
+</body>
+</html>
