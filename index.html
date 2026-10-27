@@ -137,6 +137,16 @@ section{margin-top:24px}
 .mode label{display:flex;align-items:flex-start;gap:10px;font-size:15px;cursor:pointer}
 .mode input{width:20px;height:20px;margin:1px 0 0;accent-color:var(--text);flex:none}
 .summary{margin-top:16px;font-size:15px}
+.keyf + .keyf{border-top:1px dashed var(--border);margin-top:20px;padding-top:4px}
+.olist{list-style:none;margin:10px 0 0;padding:0}
+.olist li{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px dashed var(--border);font-size:15px;min-width:0}
+.olist li:first-child{border-top:0}
+.olist .num{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--muted);width:16px;flex:none}
+.olist .nm{font-weight:600}
+.olist .st{color:var(--muted);font-size:14px;flex:1 1 auto;min-width:0}
+.olist .xbtn{flex:none}
+.xbtn:disabled{opacity:.35;cursor:default}
+.readby{margin:4px 0 0;font-size:14px;color:var(--muted)}
 
 @media (max-width:1024px){
   .dials{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -172,15 +182,14 @@ section{margin-top:24px}
 
   <section class="card" id="settingsCard" hidden>
     <h2>Settings</h2>
-    <div class="field">
-      <label for="keyInput">Gemini API key</label>
-      <input class="input mono" id="keyInput" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste your key">
-      <p class="hint" id="keyState"></p>
-      <div class="btnrow">
-        <button type="button" class="btn primary" id="saveKeyBtn">Save key</button>
-        <button type="button" class="btn" id="removeKeyBtn">Remove key</button>
+    <div id="keyFields"></div>
+    <p class="hint">Keys stay on this phone. Each key is sent only to its own company (Google, OpenAI or Anthropic), when you read a timetable. Gemini has a free tier. OpenAI and Claude charge for each photo read.</p>
+    <div class="sep">
+      <div class="field">
+        <span class="flabel">Reading order</span>
+        <p class="hint" style="margin-top:0">The app tries these in order and skips any without a key. If one is busy or out of its limit, it moves to the next.</p>
       </div>
-      <p class="hint">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. The key stays on this phone. It is sent only to Google, when you read a timetable.</p>
+      <ol class="olist" id="orderList"></ol>
     </div>
     <div class="sep">
       <div class="field">
@@ -482,14 +491,32 @@ function renderLive(){
   else $('nextThen').textContent = 'Then nothing else this week';
 }
 
-/* ===================== PHOTO UPLOAD (Gemini) ===================== */
+/* ===================== PHOTO UPLOAD (Gemini, OpenAI, Claude) ===================== */
 const CONFIG = {
   geminiModel: 'gemini-3.8-flash',   // fast Gemini vision model; change here if Google renames it
   geminiBase: 'https://generativelanguage.googleapis.com/v1beta/models/',
+  openaiModel: 'gpt-6.1-terra',      // OpenAI vision model (Responses API); change here if OpenAI renames it
+  openaiUrl: 'https://api.openai.com/v1/responses',
+  openaiEffort: 'low',
+  claudeModel: 'claude-sonnet-5-5',  // Claude vision model (Messages API); change here if Anthropic renames it
+  claudeUrl: 'https://api.anthropic.com/v1/messages',
+  anthropicVersion: '2023-06-01',
+  claudeMaxTokens: 8000,
+  timeoutMs: 45000,                  // give up on a service after this long and try the next one
   maxImageSide: 1600, jpegQuality: 0.85,
   defaultName: 'Paul Ebenezer', defaultAliases: 'Mr. Paul Ebenezer, Paul'
 };
-const LS = { key:'teachingDial.geminiKey', name:'teachingDial.name', aliases:'teachingDial.aliases', week:'teachingDial.week' };
+const LS = { key:'teachingDial.geminiKey', openaiKey:'teachingDial.openaiKey', claudeKey:'teachingDial.claudeKey', order:'teachingDial.order',
+             name:'teachingDial.name', aliases:'teachingDial.aliases', week:'teachingDial.week' };
+const PROVIDERS = {
+  gemini: { name:'Gemini', company:'Google', label:'Gemini API key', ls:LS.key,
+            get:'Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.' },
+  openai: { name:'OpenAI', company:'OpenAI', label:'OpenAI (ChatGPT) API key', ls:LS.openaiKey,
+            get:'Get a key at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com/api-keys</a>. Paid: OpenAI bills each photo read.' },
+  claude: { name:'Claude', company:'Anthropic', label:'Claude API key', ls:LS.claudeKey,
+            get:'Get a key at <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com/settings/keys</a>. Paid: Anthropic bills each photo read.' }
+};
+const DEFAULT_ORDER = ['gemini', 'openai', 'claude'];
 const EXTRA_COLOURS = ['var(--x1)','var(--x2)','var(--x3)','var(--x4)'];
 const lsGet = k => { try { return localStorage.getItem(k); } catch(e){ return null; } };
 const lsSet = (k,v) => { try { localStorage.setItem(k,v); return true; } catch(e){ return false; } };
@@ -500,6 +527,14 @@ function activeData(){ return SAVED ? SAVED.data : WEEK_DATA; }
 const $id = id => document.getElementById(id);
 const toHHMM = m => `${pad(Math.floor(m/60))}:${pad(m%60)}`;
 const DAY_KEYS = ['Mon','Tue','Wed','Thu','Fri','Sat'];
+function providerOrder(){
+  try { const o = JSON.parse(lsGet(LS.order) || 'null');
+    if (Array.isArray(o) && o.length === DEFAULT_ORDER.length && DEFAULT_ORDER.every(id => o.includes(id))) return o; } catch(e){}
+  return DEFAULT_ORDER.slice();
+}
+const keyOf = id => lsGet(PROVIDERS[id].ls);
+const anyKey = () => DEFAULT_ORDER.some(keyOf);
+let KEY_PROBLEM = {};   // provider -> 'badkey' | 'model' from the last read, shown in Settings
 
 /* ---------- settings ---------- */
 function myNames(){
@@ -510,16 +545,43 @@ function myNames(){
     known: new Set([...ft, ...aliases.flatMap(nameTokens)]),
     aliasKeys: aliases.map(a => nameTokens(a).join(' ')).filter(k => k.split(' ').length >= 2) };
 }
+$id('keyFields').innerHTML = DEFAULT_ORDER.map(id => { const P = PROVIDERS[id]; return `<div class="field keyf">
+      <label for="key-${id}">${P.label}</label>
+      <input class="input mono" id="key-${id}" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste your key">
+      <p class="hint" id="keyState-${id}"></p>
+      <div class="btnrow">
+        <button type="button" class="btn primary" data-save="${id}">Save key</button>
+        <button type="button" class="btn" data-remove="${id}">Remove key</button>
+      </div>
+      <p class="hint">${P.get}</p>
+    </div>`; }).join('');
+function renderOrder(){
+  const order = providerOrder();
+  $id('orderList').innerHTML = order.map((id, i) => `<li data-p="${id}"><span class="num">${i+1}</span><span class="nm">${PROVIDERS[id].name}</span>
+      <span class="st">${keyOf(id) ? (KEY_PROBLEM[id] === 'badkey' ? 'Key not accepted' : 'Key saved') : 'No key, skipped'}</span>
+      <button type="button" class="xbtn" data-up="${i}" aria-label="Move ${PROVIDERS[id].name} up"${i === 0 ? ' disabled' : ''}>↑</button>
+      <button type="button" class="xbtn" data-down="${i}" aria-label="Move ${PROVIDERS[id].name} down"${i === order.length - 1 ? ' disabled' : ''}>↓</button></li>`).join('');
+  const move = (i, d) => { const o = providerOrder(); [o[i], o[i+d]] = [o[i+d], o[i]]; lsSet(LS.order, JSON.stringify(o)); renderOrder(); };
+  $id('orderList').querySelectorAll('[data-up]').forEach(b => b.onclick = () => move(+b.dataset.up, -1));
+  $id('orderList').querySelectorAll('[data-down]').forEach(b => b.onclick = () => move(+b.dataset.down, 1));
+}
+function renderKeys(){
+  DEFAULT_ORDER.forEach(id => {
+    const key = keyOf(id), P = PROVIDERS[id];
+    const problem = KEY_PROBLEM[id] === 'badkey' ? ` ${P.company} did not accept it on the last read.` : KEY_PROBLEM[id] === 'model' ? ` ${P.company} did not offer the model on the last read.` : '';
+    $id('keyState-' + id).textContent = key ? `Key saved on this phone, ending in ${key.slice(-4)}.${problem}` : 'No key saved yet.';
+    document.querySelector(`[data-remove="${id}"]`).disabled = !key;
+    $id('key-' + id).value = '';
+    $id('key-' + id).placeholder = key ? 'Paste a new key to replace it' : 'Paste your key';
+  });
+  renderOrder();
+}
 function renderDataState(){
   const st = SAVED ? `Showing your saved week${SAVED.savedAt ? ', updated ' + new Intl.DateTimeFormat('en-GB',{timeZone:TZ,day:'numeric',month:'short'}).format(new Date(SAVED.savedAt)) : ''}.` : 'Showing the sample week.';
   $id('dataStatus').textContent = st;
   $id('weekState').textContent = SAVED ? st + ' Reset to go back to the sample week.' : st;
   $id('resetBtn').disabled = !SAVED;
-  const key = lsGet(LS.key);
-  $id('keyState').textContent = key ? `Key saved on this phone, ending in ${key.slice(-4)}.` : 'No key saved yet.';
-  $id('removeKeyBtn').disabled = !key;
-  $id('keyInput').value = '';
-  $id('keyInput').placeholder = key ? 'Paste a new key to replace it' : 'Paste your key';
+  renderKeys();
   const me = myNames(); $id('nameInput').value = me.full; $id('aliasInput').value = me.aliases.join(', ');
 }
 function toggleSettings(show){
@@ -529,13 +591,13 @@ function toggleSettings(show){
 }
 $id('settingsBtn').onclick = () => toggleSettings();
 $id('closeSettingsBtn').onclick = () => toggleSettings(false);
-$id('saveKeyBtn').onclick = () => {
-  const v = $id('keyInput').value.trim();
-  if (!v){ $id('keyState').textContent = 'Paste the key first.'; return; }
-  if (!lsSet(LS.key, v)){ $id('keyState').textContent = 'Could not save on this phone. Private browsing may block saving.'; return; }
-  renderDataState();
-};
-$id('removeKeyBtn').onclick = () => { lsDel(LS.key); renderDataState(); };
+document.querySelectorAll('[data-save]').forEach(b => b.onclick = () => {
+  const id = b.dataset.save, v = $id('key-' + id).value.trim();
+  if (!v){ $id('keyState-' + id).textContent = 'Paste the key first.'; return; }
+  if (!lsSet(PROVIDERS[id].ls, v)){ $id('keyState-' + id).textContent = 'Could not save on this phone. Private browsing may block saving.'; return; }
+  delete KEY_PROBLEM[id]; renderKeys();
+});
+document.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => { lsDel(PROVIDERS[b.dataset.remove].ls); delete KEY_PROBLEM[b.dataset.remove]; renderKeys(); });
 $id('saveNameBtn').onclick = () => {
   const n = $id('nameInput').value.trim();
   if (!n){ $id('nameState').textContent = 'Enter your name first.'; return; }
@@ -592,18 +654,25 @@ function mondayOf(dateStr){
 }
 function defaultMonday(){ const t = istNow().date; return mondayOf(t); }
 
-/* ---------- Gemini request ---------- */
+/* ---------- AI requests (Gemini, OpenAI, Claude) ---------- */
 class UserError extends Error { constructor(kind, detail){ super(kind); this.kind = kind; this.detail = detail || ''; } }
 const ERR = {
-  nokey: 'Add your Gemini API key in Settings first.',
-  badkey: 'Google did not accept the API key. Check it in Settings, or make a new key at aistudio.google.com/apikey.',
-  network: 'Could not reach Google. Check the internet connection and try again.',
-  quota: 'Gemini says the free limit is used up for now. Wait a minute and try again.',
-  model: `The Gemini model "${CONFIG.geminiModel}" is not available for this key.`,
+  nokey: 'Add an API key in Settings first: Gemini, OpenAI or Claude.',
   unreadable: 'Could not read a timetable from this photo. Try a clearer photo taken straight on.',
   image: 'This photo could not be opened. Try a JPEG or PNG photo.',
-  api: 'Gemini returned an error.',
+  api: 'The AI service returned an error.',
 };
+// How a failed service is described: [one service, two or more]
+const FAIL = {
+  busy:    ['was busy', 'were busy'],
+  quota:   ['had used up its limit', 'had used up their limits'],
+  timeout: ['took too long to answer', 'took too long to answer'],
+  network: ['could not be reached', 'could not be reached'],
+  badkey:  ['did not accept the key', 'did not accept their keys'],
+  model:   ['does not offer the model set in the app', 'do not offer the models set in the app'],
+  api:     ['returned an error', 'returned errors'],
+};
+const TRY_NEXT = new Set(Object.keys(FAIL));   // these move on to the next service; a photo that cannot be read does not
 const PROMPT = `Read this class timetable photo. It may be printed or handwritten, and the photo may be rotated.
 Return:
 - batch: the batch or class name as written (for example "III Year B.Sc. Nursing").
@@ -640,38 +709,138 @@ async function downscale(file){
   const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
   return { base64: c.toDataURL('image/jpeg', CONFIG.jpegQuality).split(',')[1], w, h };
 }
-async function readTimetable(file, key){
-  const img = await downscale(file);
-  let res;
+// The same schema in standard JSON Schema form, for OpenAI and Claude structured output.
+function toJsonSchema(n){
+  const o = {};
+  Object.entries(n).forEach(([k, v]) => {
+    if (k === 'type') o.type = String(v).toLowerCase();
+    else if (k === 'properties') o.properties = Object.fromEntries(Object.entries(v).map(([pk, pv]) => [pk, toJsonSchema(pv)]));
+    else if (k === 'items') o.items = toJsonSchema(v);
+    else o[k] = v;
+  });
+  if (o.type === 'object') o.additionalProperties = false;
+  return o;
+}
+const JSON_SCHEMA = toJsonSchema(SCHEMA);
+async function post(url, headers, body){
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), CONFIG.timeoutMs);
+  let res, text = '';
   try {
-    res = await fetch(`${CONFIG.geminiBase}${CONFIG.geminiModel}:generateContent`, {
-      method:'POST', headers:{'Content-Type':'application/json', 'x-goog-api-key':key},
-      body: JSON.stringify({
-        contents:[{ role:'user', parts:[{ text:PROMPT }, { inline_data:{ mime_type:'image/jpeg', data:img.base64 } }] }],
-        generationConfig:{ responseMimeType:'application/json', responseSchema:SCHEMA }
-      })
-    });
-  } catch(e){ throw new UserError('network'); }
-  if (!res.ok){
-    let body = {}; try { body = await res.json(); } catch(e){}
-    const all = JSON.stringify(body.error || body), msg = (body.error && body.error.message) || '';
-    if (/API_KEY_INVALID|API key not valid|API_KEY_/i.test(all) || res.status === 401 || res.status === 403) throw new UserError('badkey');
-    if (res.status === 429) throw new UserError('quota');
-    if (res.status === 404) throw new UserError('model');
-    throw new UserError('api', `${res.status}${msg ? ': ' + msg : ''}`);
+    res = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json', ...headers }, body:JSON.stringify(body), signal:ctl.signal });
+    text = await res.text();
+  } catch(e){ throw new UserError(ctl.signal.aborted ? 'timeout' : 'network'); }
+  finally { clearTimeout(timer); }
+  let data = null; try { data = JSON.parse(text); } catch(e){}
+  if (!res.ok) throw httpError(res.status, data, text);
+  if (!data) throw new UserError('unreadable');
+  return data;
+}
+function httpError(status, data, text){
+  const all = String(text || '').slice(0, 4000);
+  const err = data && data.error, msg = err && typeof err === 'object' ? (err.message || '') : (typeof err === 'string' ? err : '');
+  const detail = `${status}${msg ? ': ' + String(msg).slice(0, 160) : ''}`;
+  if (status === 401 || status === 403 || /API_KEY_INVALID|API key not valid|invalid_api_key|Incorrect API key|authentication_error|permission_error|invalid x-api-key/i.test(all)) return new UserError('badkey', detail);
+  if (/insufficient_quota|RESOURCE_EXHAUSTED|credit balance|exceeded your current quota/i.test(all)) return new UserError('quota', detail);
+  if ([429, 500, 502, 503, 504, 529].includes(status) || /overloaded|\bUNAVAILABLE\b|rate_limit/i.test(all)) return new UserError(status === 429 ? 'quota' : 'busy', detail);
+  if (status === 404) return new UserError('model', detail);
+  return new UserError('api', detail);
+}
+// Pull the timetable JSON out of a reply, even if it comes wrapped in a code fence or a sentence.
+function parseTimetable(text){
+  let t = String(text || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim(), json = null;
+  try { json = JSON.parse(t); } catch(e){
+    const a = t.indexOf('{'), b = t.lastIndexOf('}');
+    if (a >= 0 && b > a) { try { json = JSON.parse(t.slice(a, b + 1)); } catch(e2){} }
   }
-  let data; try { data = await res.json(); } catch(e){ throw new UserError('unreadable'); }
-  const text = ((data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [])
-    .filter(p => p.text && !p.thought).map(p => p.text).join('');
-  let json; try { json = JSON.parse(text); } catch(e){ throw new UserError('unreadable'); }
-  if (!json || !Array.isArray(json.rows) || !json.rows.length) throw new UserError('unreadable');
+  if (!json || typeof json !== 'object' || !Array.isArray(json.rows) || !json.rows.length) throw new UserError('unreadable');
+  json.rows = json.rows.filter(r => r && typeof r === 'object').map(r => ({ ...r, slots: Array.isArray(r.slots) ? r.slots.filter(x => x && typeof x === 'object') : [] }));
+  if (!json.rows.length) throw new UserError('unreadable');
+  ['batch', 'semester', 'weekStart', 'weekEnd'].forEach(k => { json[k] = json[k] == null ? '' : String(json[k]); });
   return json;
+}
+const READERS = {
+  async gemini(img, key){
+    const data = await post(`${CONFIG.geminiBase}${CONFIG.geminiModel}:generateContent`, { 'x-goog-api-key':key }, {
+      contents:[{ role:'user', parts:[{ text:PROMPT }, { inline_data:{ mime_type:'image/jpeg', data:img.base64 } }] }],
+      generationConfig:{ responseMimeType:'application/json', responseSchema:SCHEMA }
+    });
+    return parseTimetable(((data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [])
+      .filter(p => p.text && !p.thought).map(p => p.text).join(''));
+  },
+  async openai(img, key){
+    const data = await post(CONFIG.openaiUrl, { 'Authorization':'Bearer ' + key }, {
+      model: CONFIG.openaiModel,
+      input:[{ role:'user', content:[
+        { type:'input_text', text:PROMPT },
+        { type:'input_image', image_url:'data:image/jpeg;base64,' + img.base64, detail:'high' } ] }],
+      text:{ format:{ type:'json_schema', name:'timetable', strict:true, schema:JSON_SCHEMA } },
+      reasoning:{ effort: CONFIG.openaiEffort }
+    });
+    const text = typeof data.output_text === 'string' && data.output_text ? data.output_text :
+      (data.output || []).filter(o => o && o.type === 'message').flatMap(o => o.content || []).filter(c => c.type === 'output_text').map(c => c.text).join('');
+    return parseTimetable(text);
+  },
+  async claude(img, key){
+    const data = await post(CONFIG.claudeUrl, {
+      'x-api-key':key, 'anthropic-version':CONFIG.anthropicVersion, 'anthropic-dangerous-direct-browser-access':'true'
+    }, {
+      model: CONFIG.claudeModel, max_tokens: CONFIG.claudeMaxTokens,
+      messages:[{ role:'user', content:[
+        { type:'image', source:{ type:'base64', media_type:'image/jpeg', data:img.base64 } },
+        { type:'text', text: PROMPT + '\nReply with the JSON object only.' } ] }],
+      output_config:{ format:{ type:'json_schema', schema:JSON_SCHEMA } }
+    });
+    if (data.stop_reason === 'refusal') throw new UserError('unreadable');
+    return parseTimetable((data.content || []).filter(c => c && c.type === 'text').map(c => c.text).join(''));
+  }
+};
+// Try each service in the saved order, skipping those without a key.
+// state.dead remembers services whose key or model failed earlier in this batch, so they are not asked again.
+async function readTimetable(file, state){
+  const img = await downscale(file), tried = [];
+  for (const id of providerOrder()){
+    const key = keyOf(id); if (!key) continue;
+    if (state.dead[id]){ tried.push({ id, kind:state.dead[id] }); continue; }
+    try { const json = await READERS[id](img, key); return { json, by:id, tried }; }
+    catch(err){
+      const kind = err.kind || 'api';
+      if (!TRY_NEXT.has(kind)){ err.tried = tried; throw err; }
+      tried.push({ id, kind, detail:err.detail });
+      if (kind === 'badkey' || kind === 'model') state.dead[id] = kind;
+    }
+  }
+  const e = new UserError('allfailed'); e.tried = tried; throw e;
+}
+const joinNames = a => a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+function failText(tried){
+  const groups = [];
+  tried.forEach(t => { let g = groups.find(x => x.kind === t.kind); if (!g){ g = { kind:t.kind, names:[] }; groups.push(g); } if (!g.names.includes(PROVIDERS[t.id].name)) g.names.push(PROVIDERS[t.id].name); });
+  return joinNames(groups.map(g => `${joinNames(g.names)} ${FAIL[g.kind][g.names.length > 1 ? 1 : 0]}`));
+}
+const readByText = (by, tried) => `Read by ${PROVIDERS[by].name}${tried.length ? ', ' + failText(tried) : ''}.`;
+function allFailedText(tried){
+  if (!tried.length) return ERR.nokey;
+  const kinds = new Set(tried.map(t => t.kind)), api = tried.filter(t => t.kind === 'api' && t.detail).map(t => `${PROVIDERS[t.id].name} ${t.detail}`);
+  let s = `Could not read the photo. ${failText(tried).replace(/^./, c => c.toUpperCase())}.`;
+  if (api.length) s += ` (${api.join('; ')})`;
+  if (kinds.has('badkey') || kinds.has('model')) s += ' Check the keys in Settings.';
+  if (kinds.has('busy') || kinds.has('quota') || kinds.has('timeout')) s += ' Try again in a few minutes' + (DEFAULT_ORDER.some(id => !keyOf(id)) ? ', or add another key in Settings as a backup.' : '.');
+  if ([...kinds].every(k => k === 'network')) s += ' Check the internet connection and try again.';
+  return s;
+}
+function problemText(problems){
+  const bad = Object.keys(problems).filter(id => problems[id] === 'badkey').map(id => PROVIDERS[id].name);
+  const mdl = Object.keys(problems).filter(id => problems[id] === 'model').map(id => PROVIDERS[id].name);
+  let s = '';
+  if (bad.length) s += `${joinNames(bad)} ${FAIL.badkey[bad.length > 1 ? 1 : 0]}, so ${bad.length > 1 ? 'they were' : 'it was'} skipped. Check ${bad.length > 1 ? 'those keys' : 'that key'} in Settings. `;
+  if (mdl.length) s += `${joinNames(mdl)} ${FAIL.model[mdl.length > 1 ? 1 : 0]}, so ${mdl.length > 1 ? 'they were' : 'it was'} skipped. `;
+  return s.trim();
 }
 
 /* ---------- upload flow ---------- */
 let PENDING = null, rowSeq = 0;
 $id('addBtn').onclick = () => {
-  if (!lsGet(LS.key)){ showUpload([], ERR.nokey); toggleSettings(true); $id('keyInput').focus(); return; }
+  if (!anyKey()){ showUpload([], ERR.nokey); toggleSettings(true); $id('key-' + providerOrder()[0]).focus(); return; }
   $id('photoInput').click();
 };
 $id('photoInput').addEventListener('change', e => { const files = [...e.target.files]; e.target.value = ''; if (files.length) handlePhotos(files); });
@@ -681,33 +850,37 @@ function showUpload(items, error){
   $id('uploadMsg').innerHTML = error ? `<div class="msg err">${esc(error)}</div>` : '';
 }
 async function handlePhotos(files){
-  const key = lsGet(LS.key);
-  if (!key){ showUpload([], ERR.nokey); toggleSettings(true); return; }
+  if (!anyKey()){ showUpload([], ERR.nokey); toggleSettings(true); return; }
   $id('checkCard').hidden = true; $id('addBtn').disabled = true;
-  const items = files.map((f, i) => ({n:i+1, text:'Waiting'})), sheets = [];
+  const items = files.map((f, i) => ({n:i+1, text:'Waiting'})), sheets = [], state = { dead:{} }, problems = {};
   let fatal = null;
   showUpload(items); $id('uploadCard').scrollIntoView({behavior:'smooth', block:'start'});
   for (let i = 0; i < files.length; i++){
     if (fatal){ items[i].text = 'Skipped'; continue; }
     items[i].text = 'Reading...'; showUpload(items);
     try {
-      const t = await readTimetable(files[i], key);
-      sheets.push(t); items[i].text = `${classLabel(t.batch, t.semester)}, ${t.rows.length} rows`;
+      const r = await readTimetable(files[i], state), t = r.json;
+      t._readBy = readByText(r.by, r.tried);
+      r.tried.forEach(x => { if (x.kind === 'badkey' || x.kind === 'model') problems[x.id] = x.kind; });
+      sheets.push(t); items[i].text = `${classLabel(t.batch, t.semester)}, ${t.rows.length} rows, read by ${PROVIDERS[r.by].name}`;
     } catch(err){
       const kind = err.kind || 'unreadable';
+      (err.tried || []).forEach(x => { if (x.kind === 'badkey' || x.kind === 'model') problems[x.id] = x.kind; });
       items[i].text = 'Not read'; items[i].bad = true;
-      if (['badkey','network','quota','model','nokey'].includes(kind)) fatal = (ERR[kind] || ERR.api);
+      if (kind === 'allfailed') fatal = allFailedText(err.tried || []);
       else items[i].why = (ERR[kind] || ERR.unreadable) + (err.detail ? ' (' + err.detail + ')' : '');
     }
     showUpload(items);
   }
+  KEY_PROBLEM = problems;
   $id('addBtn').disabled = false;
   const why = items.filter(x => x.why).map(x => `Photo ${x.n}: ${x.why}`).join(' ');
-  if (fatal){ showUpload(items, fatal); if (/Settings/.test(fatal)) toggleSettings(true); return; }
-  if (!sheets.length){ showUpload(items, why || ERR.unreadable); return; }
+  const warn = fatal ? '' : problemText(problems);
+  if (fatal){ showUpload(items, fatal); if (/Settings/.test(fatal) && /key/.test(fatal)) toggleSettings(true); return; }
+  if (!sheets.length){ showUpload(items, [warn, why || ERR.unreadable].filter(Boolean).join(' ')); return; }
   buildPending(sheets);
   const matched = PENDING.rows.length;
-  showUpload(items, matched ? (why || '') : `No classes found for ${myNames().full} on ${sheets.length > 1 ? 'these timetables' : 'this timetable'}. Check My name in Settings, or add the classes by hand below.`);
+  showUpload(items, [warn, matched ? why : `No classes found for ${myNames().full} on ${sheets.length > 1 ? 'these timetables' : 'this timetable'}. Check My name in Settings, or add the classes by hand below.`].filter(Boolean).join(' '));
   renderCheck(); $id('checkCard').hidden = false; $id('checkCard').scrollIntoView({behavior:'smooth', block:'start'});
 }
 function rowsFromSheetRow(sheet, row){
@@ -733,7 +906,7 @@ function buildPending(sheets){
     });
     const m = mondayOf(sheet.weekStart) || mondayOf(sheet.weekEnd);
     if (!monday && m) monday = m;
-    info.push({ label: classLabel(sheet.batch, sheet.semester), dates: [sheet.weekStart, sheet.weekEnd].filter(Boolean).join(' to '), found, ignored, monday: m });
+    info.push({ readBy: sheet._readBy || '', label: classLabel(sheet.batch, sheet.semester), dates: [sheet.weekStart, sheet.weekEnd].filter(Boolean).join(' to '), found, ignored, monday: m });
   });
   const differ = new Set(info.map(x => x.monday).filter(Boolean)).size > 1;
   PENDING = { rows, info, monday: monday || defaultMonday(), differ };
@@ -744,6 +917,7 @@ function renderCheck(){
   $id('checkSheets').innerHTML = P.info.map((s, si) => `<div class="sheet">
       <div class="eyebrow">Timetable ${si+1} of ${P.info.length}</div>
       <div class="next-subject" style="font-size:16px;margin-top:4px">${esc(s.label)}${s.dates ? ` <span class="mono muted" style="font-weight:400;font-size:14px">${esc(s.dates)}</span>` : ''}</div>
+      ${s.readBy ? `<p class="readby">${esc(s.readBy)}</p>` : ''}
       ${s.found.length ? s.found.map(f => `<p class="who">Found you as "${esc(f.coord)}" on ${esc(shortSubject(f.subject))} <span class="muted">(${esc(f.how)})</span></p>`).join('') : `<p class="who muted">Your name was not found on this sheet.</p>`}
       ${s.ignored.map((g, gi) => `<p class="ignored"><span>Ignored: ${esc(g.coord)}, ${esc(g.reason)} (${esc(shortSubject(g.subject))})</span><button type="button" class="btn" data-addign="${si}:${gi}">Add anyway</button></p>`).join('')}
     </div>`).join('') + (P.differ ? `<div class="msg err">These timetables show different weeks. Check the week below.</div>` : '');
